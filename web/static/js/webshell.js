@@ -1658,6 +1658,8 @@ function buildWebshellTimelineItemFromDetail(detail) {
         title = ap + ((typeof window.t === 'function') ? window.t('chat.iterationRound', { n: data.iteration || 1 }) : ('第 ' + (data.iteration || 1) + ' 轮迭代'));
     } else if (eventType === 'thinking') {
         title = ap + '🤔 ' + ((typeof window.t === 'function') ? window.t('chat.aiThinking') : 'AI 思考');
+    } else if (eventType === 'reasoning_chain') {
+        title = ap + '🔗 ' + ((typeof window.t === 'function') ? window.t('chat.reasoningChain') : '推理过程');
     } else if (eventType === 'tool_calls_detected') {
         title = ap + '🔧 ' + ((typeof window.t === 'function') ? window.t('chat.toolCallsDetected', { count: data.count || 0 }) : ('检测到 ' + (data.count || 0) + ' 个工具调用'));
     } else if (eventType === 'tool_call') {
@@ -2847,6 +2849,12 @@ function runWebshellAiSend(conn, inputEl, sendBtn, messagesContainer) {
         if (info && info.orchestration) {
             body.orchestration = info.orchestration;
         }
+        if (typeof window.buildReasoningRequestPayload === 'function') {
+            var rp = window.buildReasoningRequestPayload();
+            if (rp) {
+                body.reasoning = rp;
+            }
+        }
         return apiFetch(info.path, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -2953,17 +2961,19 @@ function runWebshellAiSend(conn, inputEl, sendBtn, messagesContainer) {
                         appendTimelineItem('iteration', '🔍 ' + iterTitle, iterMessage, _ed);
                         if (!streamingTarget) assistantDiv.textContent = '…';
 
-                    // ─── Thinking (non-stream + stream) ───
-                    } else if (_et === 'thinking_stream_start' && _ed.streamId) {
+                    // ─── Thinking / reasoning_chain（推理过程，reasoning_content） ───
+                    } else if ((_et === 'thinking_stream_start' || _et === 'reasoning_chain_stream_start') && _ed.streamId) {
+                        var isRcStart = _et === 'reasoning_chain_stream_start';
                         if (wsThinkingStreams.has(_ed.streamId)) {
                             var tsExist = wsThinkingStreams.get(_ed.streamId);
                             tsExist.buf = '';
                             if (tsExist.body) tsExist.body.textContent = '';
                         } else {
-                        var thinkSLabel = wsTOr('chat.aiThinking', 'AI 思考');
+                        var thinkSLabel = wsTOr(isRcStart ? 'chat.reasoningChain' : 'chat.aiThinking', isRcStart ? '推理过程' : 'AI 思考');
+                        var thinkEmoji = isRcStart ? '🔗' : '🤔';
                         var thinkSItem = document.createElement('div');
-                        thinkSItem.className = 'webshell-ai-timeline-item webshell-ai-timeline-thinking';
-                        thinkSItem.innerHTML = '<span class="webshell-ai-timeline-title">' + escapeHtml(webshellAgentPx(_ed) + '🤔 ' + thinkSLabel) + '</span>';
+                        thinkSItem.className = 'webshell-ai-timeline-item webshell-ai-timeline-' + (isRcStart ? 'reasoning_chain' : 'thinking');
+                        thinkSItem.innerHTML = '<span class="webshell-ai-timeline-title">' + escapeHtml(webshellAgentPx(_ed) + thinkEmoji + ' ' + thinkSLabel) + '</span>';
                         var thinkSPre = document.createElement('div');
                         thinkSPre.className = 'webshell-ai-timeline-msg webshell-thinking-stream-body';
                         thinkSItem.appendChild(thinkSPre);
@@ -2972,7 +2982,7 @@ function runWebshellAiSend(conn, inputEl, sendBtn, messagesContainer) {
                         wsThinkingStreams.set(_ed.streamId, { el: thinkSItem, body: thinkSPre, buf: '' });
                         }
                         if (!streamingTarget) assistantDiv.textContent = '…';
-                    } else if (_et === 'thinking_stream_delta' && _ed.streamId) {
+                    } else if ((_et === 'thinking_stream_delta' || _et === 'reasoning_chain_stream_delta') && _ed.streamId) {
                         var tsD = wsThinkingStreams.get(_ed.streamId);
                         if (tsD) {
                             var normT = (typeof window.normalizeStreamingDeltaJs === 'function')
@@ -2985,7 +2995,7 @@ function runWebshellAiSend(conn, inputEl, sendBtn, messagesContainer) {
                             }
                         }
                         if (!streamingTarget) assistantDiv.textContent = '…';
-                    } else if (_et === 'thinking_stream_end' && _ed.streamId) {
+                    } else if ((_et === 'thinking_stream_end' || _et === 'reasoning_chain_stream_end') && _ed.streamId) {
                         var tsE = wsThinkingStreams.get(_ed.streamId);
                         if (tsE) {
                             var fullThink = (_em != null && _em !== '') ? String(_em) : tsE.buf;
@@ -2996,13 +3006,15 @@ function runWebshellAiSend(conn, inputEl, sendBtn, messagesContainer) {
                             }
                             wsThinkingStreams.delete(_ed.streamId);
                         }
-                    } else if (_et === 'thinking' && _em) {
+                    } else if ((_et === 'thinking' || _et === 'reasoning_chain') && _em) {
                         // 如果有 streamId 且已存在流式条目，跳过避免重复
                         if (_ed.streamId && wsThinkingStreams.has(_ed.streamId)) {
-                            // 已由 thinking_stream_* 处理
+                            // 已由 *_stream_* 处理
                         } else {
-                            var thinkLabel = wsTOr('chat.aiThinking', 'AI 思考');
-                            appendTimelineItem('thinking', webshellAgentPx(_ed) + '🤔 ' + thinkLabel, _em, _ed);
+                            var isRc = _et === 'reasoning_chain';
+                            var thinkLabel = wsTOr(isRc ? 'chat.reasoningChain' : 'chat.aiThinking', isRc ? '推理过程' : 'AI 思考');
+                            var thinkEm = isRc ? '🔗' : '🤔';
+                            appendTimelineItem(isRc ? 'reasoning_chain' : 'thinking', webshellAgentPx(_ed) + thinkEm + ' ' + thinkLabel, _em, _ed);
                         }
                         if (!streamingTarget) assistantDiv.textContent = '…';
 

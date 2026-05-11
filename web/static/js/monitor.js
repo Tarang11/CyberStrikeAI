@@ -1223,10 +1223,13 @@ function handleStreamEvent(event, progressElement, progressId,
             break;
         }
             
-        case 'thinking_stream_start': {
+        case 'thinking_stream_start':
+        case 'reasoning_chain_stream_start': {
             const d = event.data || {};
             const streamId = d.streamId || null;
             if (!streamId) break;
+
+            const timelineType = event.type === 'reasoning_chain_stream_start' ? 'reasoning_chain' : 'thinking';
 
             let state = thinkingStreamStateByProgressId.get(progressId);
             if (!state) {
@@ -1246,9 +1249,12 @@ function handleStreamEvent(event, progressElement, progressId,
                 }
                 break;
             }
-            const thinkBase = typeof window.t === 'function' ? window.t('chat.aiThinking') : 'AI思考';
-            const title = timelineAgentBracketPrefix(d) + '🤔 ' + thinkBase;
-            const itemId = addTimelineItem(timeline, 'thinking', {
+            const labelBase = typeof window.t === 'function'
+                ? window.t(timelineType === 'reasoning_chain' ? 'chat.reasoningChain' : 'chat.aiThinking')
+                : (timelineType === 'reasoning_chain' ? '推理过程' : 'AI思考');
+            const emoji = timelineType === 'reasoning_chain' ? '🔗' : '🤔';
+            const title = timelineAgentBracketPrefix(d) + emoji + ' ' + labelBase;
+            const itemId = addTimelineItem(timeline, timelineType, {
                 title: title,
                 message: ' ',
                 data: d
@@ -1257,7 +1263,8 @@ function handleStreamEvent(event, progressElement, progressId,
             break;
         }
 
-        case 'thinking_stream_delta': {
+        case 'thinking_stream_delta':
+        case 'reasoning_chain_stream_delta': {
             const d = event.data || {};
             const streamId = d.streamId || null;
             if (!streamId) break;
@@ -1281,7 +1288,9 @@ function handleStreamEvent(event, progressElement, progressId,
         }
 
         case 'thinking':
-            // 如果本 thinking 是由 thinking_stream_* 聚合出来的（带 streamId），避免重复创建 timeline item
+        case 'reasoning_chain': {
+            const timelineType = event.type === 'reasoning_chain' ? 'reasoning_chain' : 'thinking';
+            // 若已由 *_stream_* 聚合（带 streamId），避免重复创建 timeline item
             if (event.data && event.data.streamId) {
                 const streamId = event.data.streamId;
                 const state = thinkingStreamStateByProgressId.get(progressId);
@@ -1303,12 +1312,17 @@ function handleStreamEvent(event, progressElement, progressId,
                 }
             }
 
-            addTimelineItem(timeline, 'thinking', {
-                title: timelineAgentBracketPrefix(event.data) + '🤔 ' + (typeof window.t === 'function' ? window.t('chat.aiThinking') : 'AI思考'),
+            const labelBase = typeof window.t === 'function'
+                ? window.t(timelineType === 'reasoning_chain' ? 'chat.reasoningChain' : 'chat.aiThinking')
+                : (timelineType === 'reasoning_chain' ? '推理过程' : 'AI思考');
+            const emoji = timelineType === 'reasoning_chain' ? '🔗' : '🤔';
+            addTimelineItem(timeline, timelineType, {
+                title: timelineAgentBracketPrefix(event.data) + emoji + ' ' + labelBase,
                 message: event.message,
                 data: event.data
             });
             break;
+        }
             
         case 'tool_calls_detected':
             addTimelineItem(timeline, 'tool_calls_detected', {
@@ -2475,7 +2489,7 @@ function addTimelineItem(timeline, type, options) {
     `;
     
     // 根据类型添加详细内容
-    if ((type === 'thinking' || type === 'planning') && options.message) {
+    if ((type === 'thinking' || type === 'reasoning_chain' || type === 'planning') && options.message) {
         const streamBody = typeof formatTimelineStreamBody === 'function'
             ? formatTimelineStreamBody(options.message, options.data)
             : options.message;
@@ -3410,6 +3424,8 @@ function refreshProgressAndTimelineI18n() {
             } else {
                 titleSpan.textContent = ap + '\uD83E\uDD14 ' + _t('chat.aiThinking');
             }
+        } else if (type === 'reasoning_chain') {
+            titleSpan.textContent = ap + '\uD83D\uDD17 ' + _t('chat.reasoningChain');
         } else if (type === 'planning') {
             if (item.dataset.orchestration && typeof einoMainStreamPlanningTitle === 'function') {
                 titleSpan.textContent = einoMainStreamPlanningTitle({

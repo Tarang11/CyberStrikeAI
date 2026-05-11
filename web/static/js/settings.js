@@ -159,6 +159,27 @@ async function loadConfig(loadTools = true) {
         if (maxTokensEl) {
             maxTokensEl.value = currentConfig.openai.max_total_tokens || 120000;
         }
+        const orm = currentConfig.openai && currentConfig.openai.reasoning ? currentConfig.openai.reasoning : {};
+        const orModeEl = document.getElementById('openai-reasoning-mode');
+        if (orModeEl) {
+            const mv = (orm.mode || 'auto').toString().trim().toLowerCase();
+            orModeEl.value = ['auto', 'on', 'off'].includes(mv) ? mv : 'auto';
+        }
+        const orEffEl = document.getElementById('openai-reasoning-effort');
+        if (orEffEl) {
+            const ev = (orm.effort || '').toString().trim().toLowerCase();
+            orEffEl.value = ['', 'low', 'medium', 'high', 'max'].includes(ev) ? ev : '';
+        }
+        const orProfEl = document.getElementById('openai-reasoning-profile');
+        if (orProfEl) {
+            const pv = (orm.profile || 'auto').toString().trim().toLowerCase();
+            const ok = ['auto', 'deepseek_compat', 'openai_compat', 'output_config_effort'];
+            orProfEl.value = ok.includes(pv) ? pv : 'auto';
+        }
+        const orAllowEl = document.getElementById('openai-reasoning-allow-client');
+        if (orAllowEl) {
+            orAllowEl.checked = orm.allow_client_reasoning !== false;
+        }
 
         // 填充FOFA配置
         const fofa = currentConfig.fofa || {};
@@ -1065,13 +1086,22 @@ async function applySettings() {
         };
         
         const wecomAgentIdVal = document.getElementById('robot-wecom-agent-id')?.value.trim();
+        const prevOpenai = (currentConfig && currentConfig.openai) ? currentConfig.openai : {};
         const config = {
             openai: {
+                ...prevOpenai,
                 provider: provider,
                 api_key: apiKey,
                 base_url: baseUrl,
                 model: model,
-                max_total_tokens: parseInt(document.getElementById('openai-max-total-tokens')?.value) || 120000
+                max_total_tokens: parseInt(document.getElementById('openai-max-total-tokens')?.value) || 120000,
+                reasoning: {
+                    ...(prevOpenai.reasoning || {}),
+                    mode: document.getElementById('openai-reasoning-mode')?.value || 'auto',
+                    effort: (document.getElementById('openai-reasoning-effort')?.value || '').trim(),
+                    profile: document.getElementById('openai-reasoning-profile')?.value || 'auto',
+                    allow_client_reasoning: document.getElementById('openai-reasoning-allow-client')?.checked !== false
+                }
             },
             fofa: {
                 email: document.getElementById('fofa-email')?.value.trim() || '',

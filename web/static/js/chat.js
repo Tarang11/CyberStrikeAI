@@ -40,6 +40,8 @@ let chatAttachmentSeq = 0;
 
 // 对话模式：react = 原生 ReAct（/agent-loop）；eino_single = Eino ADK 单代理（/api/eino-agent/stream）；deep / plan_execute / supervisor = Eino 多代理（/api/multi-agent/stream，请求体 orchestration）
 const AGENT_MODE_STORAGE_KEY = 'cyberstrike-chat-agent-mode';
+const REASONING_MODE_LS = 'cyberstrike-chat-reasoning-mode';
+const REASONING_EFFORT_LS = 'cyberstrike-chat-reasoning-effort';
 const CHAT_AGENT_MODE_REACT = 'react';
 const CHAT_AGENT_MODE_EINO_SINGLE = 'eino_single';
 const CHAT_AGENT_EINO_MODES = ['deep', 'plan_execute', 'supervisor'];
@@ -492,6 +494,132 @@ function syncAgentModeFromValue(value) {
         const v = el.getAttribute('data-value');
         el.classList.toggle('selected', v === value);
     });
+    syncReasoningRowVisibility(value);
+}
+
+function syncReasoningRowVisibility(modeVal) {
+    const wrap = document.getElementById('chat-reasoning-wrapper');
+    if (!wrap) return;
+    const show = modeVal === CHAT_AGENT_MODE_EINO_SINGLE || (multiAgentAPIEnabled && chatAgentModeIsEino(modeVal));
+    wrap.style.display = show ? '' : 'none';
+    if (!show) {
+        closeChatReasoningPanel();
+    } else {
+        updateChatReasoningSummary();
+    }
+}
+
+function reasoningSummaryModeLabel(mode) {
+    const m = (mode || 'default').trim();
+    const t = (typeof window.t === 'function') ? window.t : function (k) { return k; };
+    switch (m) {
+        case 'off': return t('chat.reasoningModeOff');
+        case 'on': return t('chat.reasoningModeOn');
+        case 'auto': return t('chat.reasoningModeAuto');
+        default: return t('chat.reasoningSummaryFollow');
+    }
+}
+
+function updateChatReasoningSummary() {
+    const el = document.getElementById('chat-reasoning-summary');
+    const modeEl = document.getElementById('chat-reasoning-mode');
+    const effEl = document.getElementById('chat-reasoning-effort');
+    if (!el || !modeEl) return;
+    const mode = (modeEl.value || 'default').trim();
+    const effort = effEl && effEl.value ? String(effEl.value).trim() : '';
+    const t = (typeof window.t === 'function') ? window.t : function (k) { return k; };
+    const modePart = reasoningSummaryModeLabel(mode);
+    const effPart = effort || t('chat.reasoningSummaryDash');
+    el.textContent = modePart + ' / ' + effPart;
+}
+
+function closeChatReasoningPanel() {
+    const panel = document.getElementById('chat-reasoning-panel');
+    const btn = document.getElementById('chat-reasoning-btn');
+    if (panel) panel.style.display = 'none';
+    if (btn) {
+        btn.classList.remove('active');
+        btn.setAttribute('aria-expanded', 'false');
+    }
+}
+
+function toggleChatReasoningPanel() {
+    const panel = document.getElementById('chat-reasoning-panel');
+    const btn = document.getElementById('chat-reasoning-btn');
+    if (!panel || !btn) return;
+    const isOpen = panel.style.display === 'flex';
+    if (isOpen) {
+        closeChatReasoningPanel();
+        return;
+    }
+    if (typeof closeAgentModePanel === 'function') {
+        closeAgentModePanel();
+    }
+    if (typeof closeRoleSelectionPanel === 'function') {
+        closeRoleSelectionPanel();
+    }
+    updateChatReasoningSummary();
+    panel.style.display = 'flex';
+    btn.classList.add('active');
+    btn.setAttribute('aria-expanded', 'true');
+}
+
+function restoreChatReasoningControlsFromStorage() {
+    try {
+        const m = document.getElementById('chat-reasoning-mode');
+        const e = document.getElementById('chat-reasoning-effort');
+        if (m) {
+            const v = localStorage.getItem(REASONING_MODE_LS);
+            if (v && ['default', 'off', 'on', 'auto'].indexOf(v) !== -1) {
+                m.value = v;
+            }
+        }
+        if (e) {
+            const v = localStorage.getItem(REASONING_EFFORT_LS);
+            if (v !== null && ['', 'low', 'medium', 'high', 'max'].indexOf(v) !== -1) {
+                e.value = v;
+            }
+        }
+        updateChatReasoningSummary();
+    } catch (err) { /* ignore */ }
+}
+
+function persistChatReasoningPrefs() {
+    try {
+        const m = document.getElementById('chat-reasoning-mode');
+        const elEff = document.getElementById('chat-reasoning-effort');
+        if (m) localStorage.setItem(REASONING_MODE_LS, m.value || 'default');
+        if (elEff) localStorage.setItem(REASONING_EFFORT_LS, elEff.value || '');
+        updateChatReasoningSummary();
+    } catch (err) { /* ignore */ }
+}
+
+/** 供 WebShell 等复用：在 Eino 路径下返回 reasoning 请求片段或 undefined */
+function buildReasoningRequestPayload() {
+    const wrap = document.getElementById('chat-reasoning-wrapper');
+    if (!wrap || wrap.style.display === 'none') {
+        return undefined;
+    }
+    const modeEl = document.getElementById('chat-reasoning-mode');
+    const effEl = document.getElementById('chat-reasoning-effort');
+    if (!modeEl) return undefined;
+    const mode = (modeEl.value || 'default').trim();
+    const effort = effEl && effEl.value ? String(effEl.value).trim() : '';
+    if (mode === 'default' && !effort) {
+        return undefined;
+    }
+    const o = {};
+    if (mode !== 'default') o.mode = mode;
+    if (effort) o.effort = effort;
+    return Object.keys(o).length ? o : undefined;
+}
+
+if (typeof window !== 'undefined') {
+    window.persistChatReasoningPrefs = persistChatReasoningPrefs;
+    window.buildReasoningRequestPayload = buildReasoningRequestPayload;
+    window.closeChatReasoningPanel = closeChatReasoningPanel;
+    window.toggleChatReasoningPanel = toggleChatReasoningPanel;
+    window.updateChatReasoningSummary = updateChatReasoningSummary;
 }
 
 function closeAgentModePanel() {
@@ -512,6 +640,9 @@ function toggleAgentModePanel() {
     if (isOpen) {
         closeAgentModePanel();
         return;
+    }
+    if (typeof closeChatReasoningPanel === 'function') {
+        closeChatReasoningPanel();
     }
     if (typeof closeRoleSelectionPanel === 'function') {
         closeRoleSelectionPanel();
@@ -563,6 +694,8 @@ async function initChatAgentModeFromConfig() {
         } catch (e) { /* ignore */ }
         sel.value = stored;
         syncAgentModeFromValue(stored);
+        restoreChatReasoningControlsFromStorage();
+        syncReasoningRowVisibility(stored);
     } catch (e) {
         console.warn('initChatAgentModeFromConfig', e);
     }
@@ -574,6 +707,9 @@ document.addEventListener('languagechange', function () {
     const v = hid.value;
     if (v === CHAT_AGENT_MODE_REACT || chatAgentModeIsEinoSingle(v) || chatAgentModeIsEino(v)) {
         syncAgentModeFromValue(v);
+    }
+    if (typeof updateChatReasoningSummary === 'function') {
+        updateChatReasoningSummary();
     }
 });
 
@@ -759,6 +895,10 @@ async function sendMessage() {
             mimeType: a.mimeType || '',
             serverPath: a.serverPath
         }));
+    }
+    const reasoningPayload = buildReasoningRequestPayload();
+    if (reasoningPayload) {
+        body.reasoning = reasoningPayload;
     }
     // 发送后清空附件列表
     chatAttachments = [];
@@ -2228,6 +2368,8 @@ function renderProcessDetails(messageId, processDetails) {
             }
         } else if (eventType === 'thinking') {
             itemTitle = agPx + '🤔 ' + (typeof window.t === 'function' ? window.t('chat.aiThinking') : 'AI思考');
+        } else if (eventType === 'reasoning_chain') {
+            itemTitle = agPx + '🔗 ' + (typeof window.t === 'function' ? window.t('chat.reasoningChain') : '推理过程');
         } else if (eventType === 'planning') {
             if (typeof window.einoMainStreamPlanningTitle === 'function') {
                 itemTitle = window.einoMainStreamPlanningTitle(data);
@@ -7231,6 +7373,14 @@ document.addEventListener('click', function(event) {
     if (agentWrap && agentPanel && agentPanel.style.display === 'flex') {
         if (!agentWrap.contains(event.target)) {
             closeAgentModePanel();
+        }
+    }
+
+    const reasoningWrap = document.getElementById('chat-reasoning-wrapper');
+    const reasoningPanel = document.getElementById('chat-reasoning-panel');
+    if (reasoningWrap && reasoningPanel && reasoningPanel.style.display === 'flex') {
+        if (!reasoningWrap.contains(event.target)) {
+            closeChatReasoningPanel();
         }
     }
 });

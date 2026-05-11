@@ -894,6 +894,8 @@
                             <div id="active-tasks-bar" class="active-tasks-bar"></div>
                             <div id="chat-messages" class="chat-messages"></div>
                             <div id="chat-input-container" class="chat-input-container">
+                                <div class="chat-input-primary-row">
+                                <div class="chat-input-leading">
                                 <div class="role-selector-wrapper">
                                     <button id="role-selector-btn" class="role-selector-btn" onclick="toggleRoleSelectionPanel()" data-i18n="chat.selectRole" data-i18n-attr="title" title="选择角色">
                                         <span id="role-selector-icon" class="role-selector-icon">🔵</span>
@@ -979,6 +981,50 @@
                                     </div>
                                     <input type="hidden" id="agent-mode-select" value="react" autocomplete="off">
                                 </div>
+                                <div id="chat-reasoning-wrapper" class="chat-reasoning-wrapper" style="display: none;">
+                                    <div class="chat-reasoning-inner">
+                                        <button type="button" id="chat-reasoning-btn" class="role-selector-btn chat-reasoning-btn" onclick="toggleChatReasoningPanel()" aria-expanded="false" aria-haspopup="dialog" aria-controls="chat-reasoning-panel" data-i18n="chat.reasoningCompactAria" data-i18n-attr="aria-label,title" data-i18n-skip-text="true" aria-label="模型推理选项" title="模型推理选项">
+                                            <span class="chat-reasoning-btn-icon" aria-hidden="true">🔎</span>
+                                            <span id="chat-reasoning-summary" class="role-selector-text chat-reasoning-btn-summary"></span>
+                                            <svg class="role-selector-arrow" width="10" height="10" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                                <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                            </svg>
+                                        </button>
+                                        <div id="chat-reasoning-panel" class="chat-reasoning-panel" style="display: none;" role="dialog" aria-labelledby="chat-reasoning-panel-title">
+                                            <div class="role-selection-panel-header chat-reasoning-panel-header">
+                                                <h3 id="chat-reasoning-panel-title" class="role-selection-panel-title" data-i18n="chat.reasoningPanelTitle">模型推理</h3>
+                                                <button type="button" class="role-selection-panel-close" onclick="closeChatReasoningPanel()" data-i18n="common.close" data-i18n-attr="title" title="关闭">
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                        <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                            <p class="chat-reasoning-panel-hint" data-i18n="chat.reasoningPanelHint">仅 Eino 请求生效，与系统设置中的默认值合并。</p>
+                                            <div class="chat-reasoning-fields">
+                                                <div class="chat-reasoning-field">
+                                                    <label class="chat-reasoning-field-label" for="chat-reasoning-mode"><span data-i18n="chat.reasoningModeLabel">模式</span></label>
+                                                    <select id="chat-reasoning-mode" class="chat-reasoning-select" onchange="persistChatReasoningPrefs()">
+                                                        <option value="default" data-i18n="chat.reasoningModeDefault">跟随系统</option>
+                                                        <option value="off" data-i18n="chat.reasoningModeOff">关闭</option>
+                                                        <option value="on" data-i18n="chat.reasoningModeOn">开启</option>
+                                                        <option value="auto" data-i18n="chat.reasoningModeAuto">自动</option>
+                                                    </select>
+                                                </div>
+                                                <div class="chat-reasoning-field">
+                                                    <label class="chat-reasoning-field-label" for="chat-reasoning-effort"><span data-i18n="chat.reasoningEffortLabel">推理强度</span></label>
+                                                    <select id="chat-reasoning-effort" class="chat-reasoning-select" onchange="persistChatReasoningPrefs()">
+                                                        <option value="" data-i18n="chat.reasoningEffortUnset">不指定</option>
+                                                        <option value="low">low</option>
+                                                        <option value="medium">medium</option>
+                                                        <option value="high">high</option>
+                                                        <option value="max">max</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                </div>
                                 <div class="chat-input-with-files">
                                     <div id="chat-file-list" class="chat-file-list" aria-label="已选文件列表"></div>
                                     <div id="chat-attachment-progress" class="chat-upload-progress-row" hidden role="status" aria-live="polite">
@@ -1002,6 +1048,7 @@
                                         <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                                     </svg>
                                 </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1988,6 +2035,38 @@
                                             <label for="openai-max-total-tokens"><span data-i18n="settingsBasic.maxTotalTokens">最大上下文 Token 数</span></label>
                                             <input type="number" id="openai-max-total-tokens" data-i18n="settingsBasic.maxTotalTokensPlaceholder" data-i18n-attr="placeholder" placeholder="120000" min="1000" step="1000" />
                                             <small style="color: var(--text-muted, #718096); font-size: 0.75rem;" data-i18n="settingsBasic.maxTotalTokensHint">内存压缩和攻击链构建共用此配置，默认 120000</small>
+                                        </div>
+                                        <div class="form-group">
+                                            <label data-i18n="settingsBasic.openaiReasoningTitle">模型推理（Eino）</label>
+                                            <small class="form-hint" data-i18n="settingsBasic.openaiReasoningHint">仅影响 Eino 单代理与多代理；对话页可覆盖（见下方「允许对话覆盖」）。</small>
+                                            <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; align-items: center;">
+                                                <label for="openai-reasoning-mode" style="font-size: 0.8125rem;" data-i18n="chat.reasoningModeLabel">模式</label>
+                                                <select id="openai-reasoning-mode" style="min-width: 120px; padding: 0.35rem 0.5rem; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0);">
+                                                    <option value="auto" data-i18n="chat.reasoningModeAuto">自动</option>
+                                                    <option value="on" data-i18n="chat.reasoningModeOn">开启</option>
+                                                    <option value="off" data-i18n="chat.reasoningModeOff">关闭</option>
+                                                </select>
+                                                <label for="openai-reasoning-effort" style="font-size: 0.8125rem;" data-i18n="chat.reasoningEffortLabel">强度</label>
+                                                <select id="openai-reasoning-effort" style="min-width: 100px; padding: 0.35rem 0.5rem; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0);">
+                                                    <option value="" data-i18n="chat.reasoningEffortUnset">不指定</option>
+                                                    <option value="low">low</option>
+                                                    <option value="medium">medium</option>
+                                                    <option value="high">high</option>
+                                                    <option value="max">max</option>
+                                                </select>
+                                                <label for="openai-reasoning-profile" style="font-size: 0.8125rem;" data-i18n="settingsBasic.openaiReasoningProfile">线路</label>
+                                                <select id="openai-reasoning-profile" style="min-width: 140px; padding: 0.35rem 0.5rem; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0);">
+                                                    <option value="auto">auto</option>
+                                                    <option value="deepseek_compat">deepseek_compat</option>
+                                                    <option value="openai_compat">openai_compat</option>
+                                                    <option value="output_config_effort">output_config_effort</option>
+                                                </select>
+                                            </div>
+                                            <label class="checkbox-label" style="margin-top: 8px;">
+                                                <input type="checkbox" id="openai-reasoning-allow-client" class="modern-checkbox" checked />
+                                                <span class="checkbox-custom"></span>
+                                                <span class="checkbox-text" data-i18n="settingsBasic.openaiReasoningAllowClient">允许对话页覆盖推理选项</span>
+                                            </label>
                                         </div>
                                         <div style="display: flex; align-items: center; gap: 8px; margin-top: 2px;">
                                             <a href="javascript:void(0)" id="test-openai-btn" onclick="testOpenAIConnection()" style="font-size: 0.8125rem; color: var(--accent-color, #3182ce); text-decoration: none; cursor: pointer; user-select: none;" data-i18n="settingsBasic.testConnection">测试连接</a>

@@ -256,6 +256,9 @@ function toggleRoleSelectionPanel() {
         if (typeof closeAgentModePanel === 'function') {
             closeAgentModePanel();
         }
+        if (typeof closeChatReasoningPanel === 'function') {
+            closeChatReasoningPanel();
+        }
         panel.style.display = 'flex'; // 使用flex布局
         // 添加打开状态的视觉反馈
         if (roleSelectorBtn) {

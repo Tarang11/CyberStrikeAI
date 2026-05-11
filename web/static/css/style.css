@@ -2391,7 +2391,118 @@ header {
     box-sizing: border-box;
 }
 
-.chat-input-container > .chat-input-with-files {
+.chat-input-primary-row {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-end;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+    width: 100%;
+}
+
+.chat-input-leading {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-end;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+/* Eino：模型推理收进浮层，保持主输入行简洁 */
+.chat-reasoning-wrapper {
+    flex-shrink: 0;
+}
+
+.chat-reasoning-inner {
+    position: relative;
+}
+
+.chat-reasoning-btn {
+    max-width: 10.5rem;
+    padding-left: 0.5rem;
+    padding-right: 0.45rem;
+}
+
+.chat-reasoning-btn .chat-reasoning-btn-icon {
+    flex-shrink: 0;
+    font-size: 0.95rem;
+    line-height: 1;
+    opacity: 0.95;
+}
+
+.chat-reasoning-btn.active .chat-reasoning-btn-icon {
+    opacity: 1;
+}
+
+.chat-reasoning-btn .chat-reasoning-btn-summary {
+    max-width: 7.6rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.chat-reasoning-btn.active {
+    border-color: rgba(49, 130, 206, 0.45);
+    background: rgba(49, 130, 206, 0.06);
+}
+
+.chat-reasoning-panel {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 0;
+    width: 288px;
+    max-width: calc(100vw - 32px);
+    background: #ffffff;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 16px;
+    padding: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), 0 4px 16px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.04);
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    text-align: left;
+}
+
+.chat-reasoning-panel-header {
+    margin-bottom: 0;
+}
+
+.chat-reasoning-panel-hint {
+    font-size: 0.75rem;
+    color: var(--text-muted, #718096);
+    margin: 0;
+    line-height: 1.45;
+}
+
+.chat-reasoning-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.chat-reasoning-field-label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-muted, #718096);
+    margin-bottom: 6px;
+}
+
+.chat-reasoning-select {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.45rem 0.6rem;
+    font-size: 0.8125rem;
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: 8px;
+    background: var(--card-bg, #fff);
+    color: var(--text-color, #2d3748);
+}
+
+.chat-input-container .chat-input-with-files,
+.chat-input-primary-row .chat-input-with-files {
     flex: 1;
     display: flex;
     flex-direction: column;
@@ -2399,7 +2510,8 @@ header {
     gap: 6px;
 }
 
-.chat-input-container > .chat-input-field {
+.chat-input-container > .chat-input-field,
+.chat-input-primary-row .chat-input-field {
     flex: 1;
     display: flex;
     min-width: 0;
@@ -3566,6 +3678,11 @@ header {
 .timeline-item-thinking {
     border-left-color: #9c27b0;
     background: rgba(156, 39, 176, 0.05);
+}
+
+.timeline-item-reasoning_chain {
+    border-left-color: #5c6bc0;
+    background: rgba(92, 107, 192, 0.06);
 }
 
 .timeline-item-tool_call {
@@ -12293,6 +12410,9 @@ header {
 }
 .webshell-ai-process-block .webshell-ai-timeline-thinking {
     border-left-color: #9c27b0;
+}
+.webshell-ai-process-block .webshell-ai-timeline-reasoning_chain {
+    border-left-color: #5c6bc0;
 }
 .webshell-ai-process-block .webshell-ai-timeline-tool_call,
 .webshell-ai-process-block .webshell-ai-timeline-tool_calls_detected {
