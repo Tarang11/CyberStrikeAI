@@ -534,34 +534,32 @@ function updateChatReasoningSummary() {
 }
 
 function closeChatReasoningPanel() {
-    const panel = document.getElementById('chat-reasoning-panel');
-    const btn = document.getElementById('chat-reasoning-btn');
-    if (panel) panel.style.display = 'none';
-    if (btn) {
-        btn.classList.remove('active');
-        btn.setAttribute('aria-expanded', 'false');
+    const wrap = document.getElementById('chat-reasoning-wrapper');
+    const toggle = document.getElementById('conversation-reasoning-toggle');
+    if (wrap) wrap.classList.add('conversation-reasoning-collapsed');
+    if (toggle) toggle.setAttribute('aria-expanded', 'false');
+}
+
+function toggleConversationReasoningCard() {
+    const wrap = document.getElementById('chat-reasoning-wrapper');
+    const toggle = document.getElementById('conversation-reasoning-toggle');
+    if (!wrap || !toggle) return;
+    wrap.classList.toggle('conversation-reasoning-collapsed');
+    const collapsed = wrap.classList.contains('conversation-reasoning-collapsed');
+    toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    if (!collapsed) {
+        if (typeof closeAgentModePanel === 'function') {
+            closeAgentModePanel();
+        }
+        if (typeof closeRoleSelectionPanel === 'function') {
+            closeRoleSelectionPanel();
+        }
+        updateChatReasoningSummary();
     }
 }
 
 function toggleChatReasoningPanel() {
-    const panel = document.getElementById('chat-reasoning-panel');
-    const btn = document.getElementById('chat-reasoning-btn');
-    if (!panel || !btn) return;
-    const isOpen = panel.style.display === 'flex';
-    if (isOpen) {
-        closeChatReasoningPanel();
-        return;
-    }
-    if (typeof closeAgentModePanel === 'function') {
-        closeAgentModePanel();
-    }
-    if (typeof closeRoleSelectionPanel === 'function') {
-        closeRoleSelectionPanel();
-    }
-    updateChatReasoningSummary();
-    panel.style.display = 'flex';
-    btn.classList.add('active');
-    btn.setAttribute('aria-expanded', 'true');
+    toggleConversationReasoningCard();
 }
 
 function restoreChatReasoningControlsFromStorage() {
@@ -619,6 +617,7 @@ if (typeof window !== 'undefined') {
     window.buildReasoningRequestPayload = buildReasoningRequestPayload;
     window.closeChatReasoningPanel = closeChatReasoningPanel;
     window.toggleChatReasoningPanel = toggleChatReasoningPanel;
+    window.toggleConversationReasoningCard = toggleConversationReasoningCard;
     window.updateChatReasoningSummary = updateChatReasoningSummary;
 }
 
@@ -7377,8 +7376,8 @@ document.addEventListener('click', function(event) {
     }
 
     const reasoningWrap = document.getElementById('chat-reasoning-wrapper');
-    const reasoningPanel = document.getElementById('chat-reasoning-panel');
-    if (reasoningWrap && reasoningPanel && reasoningPanel.style.display === 'flex') {
+    if (reasoningWrap && reasoningWrap.style.display !== 'none' &&
+        !reasoningWrap.classList.contains('conversation-reasoning-collapsed')) {
         if (!reasoningWrap.contains(event.target)) {
             closeChatReasoningPanel();
         }

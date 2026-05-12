@@ -792,11 +792,51 @@
                                     <div id="conversations-list" class="conversations-list"></div>
                                 </div>
                             </div>
+                            <div id="chat-reasoning-wrapper" class="chat-reasoning-wrapper conversation-reasoning-card conversation-reasoning-collapsed" style="display: none;">
+                                <button type="button" id="conversation-reasoning-toggle" class="conversation-reasoning-card-header" onclick="toggleConversationReasoningCard()" aria-expanded="false" aria-controls="conversation-reasoning-body" data-i18n="chat.reasoningCompactAria" data-i18n-attr="aria-label,title" data-i18n-skip-text="true" aria-label="模型推理选项" title="模型推理选项">
+                                    <div class="conversation-reasoning-heading">
+                                        <span class="conversation-reasoning-icon" aria-hidden="true">
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.75"/>
+                                                <path d="M16 16l5 5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+                                            </svg>
+                                        </span>
+                                        <div class="conversation-reasoning-heading-text">
+                                            <span class="conversation-reasoning-title" data-i18n="chat.reasoningPanelTitle">模型推理</span>
+                                            <span id="chat-reasoning-summary" class="conversation-reasoning-summary"></span>
+                                        </div>
+                                    </div>
+                                </button>
+                                <div id="conversation-reasoning-body" class="conversation-reasoning-body" role="region">
+                                    <p class="chat-reasoning-panel-hint" data-i18n="chat.reasoningPanelHint">仅 Eino 请求生效，与系统设置中的默认值合并。</p>
+                                    <div class="chat-reasoning-fields">
+                                        <div class="chat-reasoning-field">
+                                            <label class="chat-reasoning-field-label" for="chat-reasoning-mode"><span data-i18n="chat.reasoningModeLabel">模式</span></label>
+                                            <select id="chat-reasoning-mode" class="chat-reasoning-select" onchange="persistChatReasoningPrefs()">
+                                                <option value="default" data-i18n="chat.reasoningModeDefault">跟随系统</option>
+                                                <option value="off" data-i18n="chat.reasoningModeOff">关闭</option>
+                                                <option value="on" data-i18n="chat.reasoningModeOn">开启</option>
+                                                <option value="auto" data-i18n="chat.reasoningModeAuto">自动</option>
+                                            </select>
+                                        </div>
+                                        <div class="chat-reasoning-field">
+                                            <label class="chat-reasoning-field-label" for="chat-reasoning-effort"><span data-i18n="chat.reasoningEffortLabel">推理强度</span></label>
+                                            <select id="chat-reasoning-effort" class="chat-reasoning-select" onchange="persistChatReasoningPrefs()">
+                                                <option value="" data-i18n="chat.reasoningEffortUnset">不指定</option>
+                                                <option value="low">low</option>
+                                                <option value="medium">medium</option>
+                                                <option value="high">high</option>
+                                                <option value="max">max</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                             <div class="hitl-sidebar-card hitl-sidebar-collapsed" id="hitl-sidebar-card">
                                 <div class="hitl-sidebar-card-header" onclick="toggleHitlSidebarCard()">
                                     <div class="hitl-sidebar-heading">
                                         <span class="hitl-sidebar-icon" aria-hidden="true">
-                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                                                 <path d="M12 2L4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3z" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/>
                                                 <path d="M9.5 12.5l2 2 3-4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
                                             </svg>
@@ -980,49 +1020,6 @@
                                         </div>
                                     </div>
                                     <input type="hidden" id="agent-mode-select" value="react" autocomplete="off">
-                                </div>
-                                <div id="chat-reasoning-wrapper" class="chat-reasoning-wrapper" style="display: none;">
-                                    <div class="chat-reasoning-inner">
-                                        <button type="button" id="chat-reasoning-btn" class="role-selector-btn chat-reasoning-btn" onclick="toggleChatReasoningPanel()" aria-expanded="false" aria-haspopup="dialog" aria-controls="chat-reasoning-panel" data-i18n="chat.reasoningCompactAria" data-i18n-attr="aria-label,title" data-i18n-skip-text="true" aria-label="模型推理选项" title="模型推理选项">
-                                            <span class="chat-reasoning-btn-icon" aria-hidden="true">🔎</span>
-                                            <span id="chat-reasoning-summary" class="role-selector-text chat-reasoning-btn-summary"></span>
-                                            <svg class="role-selector-arrow" width="10" height="10" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                                                <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                                            </svg>
-                                        </button>
-                                        <div id="chat-reasoning-panel" class="chat-reasoning-panel" style="display: none;" role="dialog" aria-labelledby="chat-reasoning-panel-title">
-                                            <div class="role-selection-panel-header chat-reasoning-panel-header">
-                                                <h3 id="chat-reasoning-panel-title" class="role-selection-panel-title" data-i18n="chat.reasoningPanelTitle">模型推理</h3>
-                                                <button type="button" class="role-selection-panel-close" onclick="closeChatReasoningPanel()" data-i18n="common.close" data-i18n-attr="title" title="关闭">
-                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                                        <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                                                    </svg>
-                                                </button>
-                                            </div>
-                                            <p class="chat-reasoning-panel-hint" data-i18n="chat.reasoningPanelHint">仅 Eino 请求生效，与系统设置中的默认值合并。</p>
-                                            <div class="chat-reasoning-fields">
-                                                <div class="chat-reasoning-field">
-                                                    <label class="chat-reasoning-field-label" for="chat-reasoning-mode"><span data-i18n="chat.reasoningModeLabel">模式</span></label>
-                                                    <select id="chat-reasoning-mode" class="chat-reasoning-select" onchange="persistChatReasoningPrefs()">
-                                                        <option value="default" data-i18n="chat.reasoningModeDefault">跟随系统</option>
-                                                        <option value="off" data-i18n="chat.reasoningModeOff">关闭</option>
-                                                        <option value="on" data-i18n="chat.reasoningModeOn">开启</option>
-                                                        <option value="auto" data-i18n="chat.reasoningModeAuto">自动</option>
-                                                    </select>
-                                                </div>
-                                                <div class="chat-reasoning-field">
-                                                    <label class="chat-reasoning-field-label" for="chat-reasoning-effort"><span data-i18n="chat.reasoningEffortLabel">推理强度</span></label>
-                                                    <select id="chat-reasoning-effort" class="chat-reasoning-select" onchange="persistChatReasoningPrefs()">
-                                                        <option value="" data-i18n="chat.reasoningEffortUnset">不指定</option>
-                                                        <option value="low">low</option>
-                                                        <option value="medium">medium</option>
-                                                        <option value="high">high</option>
-                                                        <option value="max">max</option>
-                                                    </select>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
                                 </div>
                                 </div>
                                 <div class="chat-input-with-files">
