@@ -187,6 +187,25 @@ function prefetchProjectsForChat() {
     ensureProjectsLoaded().catch(() => {});
 }
 
+/** 新对话时：保留有效 activeProjectId，否则默认选中第一个进行中的项目 */
+async function ensureDefaultActiveProjectForNewChat() {
+    try {
+        await ensureProjectsLoaded();
+        const cur = getActiveProjectId();
+        if (cur && isActiveChatProjectId(cur)) return cur;
+        const first =
+            projectsCache.find((p) => p.pinned && p.status !== 'archived') ||
+            projectsCache.find((p) => p.status !== 'archived');
+        if (first) {
+            setActiveProjectId(first.id);
+            return first.id;
+        }
+    } catch (e) {
+        console.warn(e);
+    }
+    return '';
+}
+
 function getProjectName(id) {
     return projectNameById[id] || id || '';
 }
@@ -357,15 +376,39 @@ function updateProjectStatusPill(status) {
     el.className = 'projects-status-pill ' + (archived ? 'projects-status-pill--archived' : 'projects-status-pill--active');
 }
 
-function updateProjectStats(factCount, vulnCount) {
+function updateProjectStats(stats) {
+    const s = stats || {};
     const f = document.getElementById('project-stat-facts');
     const v = document.getElementById('project-stat-vulns');
-    if (f) f.textContent = `${factCount ?? 0} 条事实`;
-    if (v) v.textContent = `${vulnCount ?? 0} 个漏洞`;
+    const c = document.getElementById('project-stat-conversations');
+    const sparse = document.getElementById('project-stat-sparse');
+    const fc = s.fact_count ?? s.factCount ?? 0;
+    const vc = s.vuln_count ?? s.vulnCount ?? 0;
+    const cc = s.conversation_count ?? s.conversationCount ?? 0;
+    const sc = s.sparse_fact_count ?? s.sparseFactCount ?? 0;
+    if (f) f.textContent = `${fc} 条事实`;
+    if (v) v.textContent = `${vc} 个漏洞`;
+    if (c) c.textContent = `${cc} 个对话`;
+    if (sparse) {
+        if (sc > 0) {
+            sparse.hidden = false;
+            sparse.textContent = `${sc} 待补全`;
+        } else {
+            sparse.hidden = true;
+        }
+    }
 }
 
 async function selectProject(id) {
     currentProjectId = id;
+    const searchEl = document.getElementById('project-facts-search');
+    const catEl = document.getElementById('project-facts-filter-category');
+    const confEl = document.getElementById('project-facts-filter-confidence');
+    const sparseEl = document.getElementById('project-facts-filter-sparse');
+    if (searchEl) searchEl.value = '';
+    if (catEl) catEl.value = '';
+    if (confEl) confEl.value = '';
+    if (sparseEl) sparseEl.checked = false;
     renderProjectsSidebar();
     updateProjectsDetailVisibility();
     try {
@@ -379,6 +422,8 @@ async function selectProject(id) {
         document.getElementById('project-edit-scope').value = p.scope_json || '';
         const statusEl = document.getElementById('project-edit-status');
         if (statusEl) statusEl.value = p.status || 'active';
+        const pinEl = document.getElementById('project-edit-pinned');
+        if (pinEl) pinEl.checked = !!p.pinned;
         updateProjectStatusPill(p.status || 'active');
         const metaEl = document.getElementById('projects-detail-meta');
         if (metaEl) metaEl.textContent = `更新于 ${formatProjectTime(p.updated_at)}`;
@@ -397,42 +442,78 @@ async function selectProject(id) {
     } catch (e) {
         console.warn(e);
     }
-    refreshProjectHeaderStats();
+    await refreshProjectHeaderStats();
     switchProjectTab(currentProjectTab);
 }
 
 function switchProjectTab(tab) {
     currentProjectTab = tab;
-    ['facts', 'vulns', 'settings'].forEach((t) => {
+    ['facts', 'conversations', 'vulns', 'settings'].forEach((t) => {
         const btn = document.getElementById(`project-tab-${t}`);
         const panel = document.getElementById(`project-panel-${t}`);
         if (btn) btn.classList.toggle('is-active', t === tab);
         if (panel) panel.hidden = t !== tab;
     });
     if (tab === 'facts') loadProjectFacts();
+    if (tab === 'conversations') loadProjectConversations();
     if (tab === 'vulns') loadProjectVulnerabilities();
+}
+
+function buildProjectFactsQueryParams() {
+    const params = new URLSearchParams();
+    params.set('limit', '200');
+    const search = document.getElementById('project-facts-search')?.value?.trim();
+    const category = document.getElementById('project-facts-filter-category')?.value?.trim();
+    const confidence = document.getElementById('project-facts-filter-confidence')?.value?.trim();
+    const sparseOnly = document.getElementById('project-facts-filter-sparse')?.checked;
+    const hideDeprecated = document.getElementById('project-facts-filter-hide-deprecated')?.checked;
+    if (search) params.set('search', search);
+    if (category) params.set('category', category);
+    if (confidence) params.set('confidence', confidence);
+    if (sparseOnly) params.set('sparse_only', 'true');
+    if (hideDeprecated) params.set('exclude_deprecated', 'true');
+    return params;
+}
+
+function debouncedLoadProjectFacts() {
+    if (_projectFactsFilterDebounce) clearTimeout(_projectFactsFilterDebounce);
+    _projectFactsFilterDebounce = setTimeout(() => {
+        _projectFactsFilterDebounce = null;
+        loadProjectFacts();
+    }, 280);
 }
 
 async function loadProjectFacts() {
     const tbody = document.getElementById('project-facts-tbody');
     if (!tbody || !currentProjectId) return;
     tbody.innerHTML = '<tr class="is-empty-row"><td colspan="7">加载中…</td></tr>';
-    const res = await apiFetch(`/api/projects/${currentProjectId}/facts?limit=200`);
+    const qs = buildProjectFactsQueryParams().toString();
+    const res = await apiFetch(`/api/projects/${currentProjectId}/facts?${qs}`);
     if (!res.ok) {
         tbody.innerHTML = '<tr class="is-empty-row"><td colspan="7">加载失败</td></tr>';
         return;
     }
     const facts = await res.json();
     if (!facts.length) {
-        tbody.innerHTML = '<tr class="is-empty-row"><td colspan="7">暂无事实，点击「添加事实」或由 Agent 自动写入</td></tr>';
+        const hasFilter =
+            document.getElementById('project-facts-search')?.value?.trim() ||
+            document.getElementById('project-facts-filter-category')?.value ||
+            document.getElementById('project-facts-filter-confidence')?.value ||
+            document.getElementById('project-facts-filter-sparse')?.checked;
+        tbody.innerHTML = `<tr class="is-empty-row"><td colspan="7">${
+            hasFilter ? '无匹配事实，请调整筛选条件' : '暂无事实，点击「添加事实」或由 Agent 自动写入'
+        }</td></tr>`;
         refreshProjectHeaderStats();
         return;
     }
     tbody.innerHTML = facts.map((f) => {
         const keyEsc = escapeHtml(f.fact_key);
         const idEsc = escapeHtml(f.id);
+        const vulnLink = f.related_vulnerability_id
+            ? `<span class="projects-fact-vuln-link" title="关联漏洞 ID">${escapeHtml(f.related_vulnerability_id.slice(0, 8))}…</span>`
+            : '';
         return `<tr>
-            <td><code>${keyEsc}</code></td>
+            <td><code>${keyEsc}</code>${vulnLink}</td>
             <td>${formatCategoryBadge(f.category)}</td>
             <td class="cell-summary" title="${escapeHtml(f.summary)}">${escapeHtml(f.summary)}</td>
             <td>${formatFactBodyBadge(f)}</td>
@@ -447,34 +528,85 @@ async function loadProjectFacts() {
 async function refreshProjectHeaderStats() {
     if (!currentProjectId) return;
     try {
-        const [factsRes, vulnRes] = await Promise.all([
-            apiFetch(`/api/projects/${currentProjectId}/facts?limit=500`),
-            apiFetch(`/api/vulnerabilities?project_id=${encodeURIComponent(currentProjectId)}&limit=100`),
-        ]);
-        let fc = 0;
-        let vc = 0;
-        if (factsRes.ok) {
-            const f = await factsRes.json();
-            fc = Array.isArray(f) ? f.length : 0;
-        }
-        if (vulnRes.ok) {
-            const d = await vulnRes.json();
-            const items = d.Vulnerabilities || d.vulnerabilities || d.items || [];
-            vc = items.length;
-        }
-        updateProjectStats(fc, vc);
+        const res = await apiFetch(`/api/projects/${currentProjectId}/stats`);
+        if (!res.ok) return;
+        const stats = await res.json();
+        updateProjectStats(stats);
     } catch (e) {
         console.warn(e);
     }
 }
 
+async function loadProjectConversations() {
+    const tbody = document.getElementById('project-conversations-tbody');
+    if (!tbody || !currentProjectId) return;
+    tbody.innerHTML = '<tr class="is-empty-row"><td colspan="3">加载中…</td></tr>';
+    const res = await apiFetch(`/api/projects/${currentProjectId}/conversations?limit=100`);
+    if (!res.ok) {
+        tbody.innerHTML = '<tr class="is-empty-row"><td colspan="3">加载失败</td></tr>';
+        return;
+    }
+    const data = await res.json();
+    const items = data.conversations || [];
+    if (!items.length) {
+        tbody.innerHTML =
+            '<tr class="is-empty-row"><td colspan="3">暂无绑定对话；在对话页选择本项目即可关联</td></tr>';
+        return;
+    }
+    tbody.innerHTML = items
+        .map((conv) => {
+            const id = conv.id;
+            const idEsc = escapeHtml(id);
+            const title = escapeHtml(conv.title || '未命名对话');
+            const updated = formatProjectTime(conv.updatedAt || conv.updated_at, conv.createdAt || conv.created_at);
+            return `<tr>
+            <td class="cell-summary" title="${title}">${title}</td>
+            <td>${escapeHtml(updated)}</td>
+            <td class="col-actions">
+                <div class="projects-table-actions">
+                    <button type="button" class="projects-action-btn projects-action-btn--view" data-conv-id="${idEsc}" onclick="openProjectConversation(this.dataset.convId)">打开</button>
+                    <button type="button" class="projects-action-btn projects-action-btn--mute" data-conv-id="${idEsc}" onclick="unbindConversationFromProject(this.dataset.convId)" title="解除项目绑定">解绑</button>
+                </div>
+            </td>
+        </tr>`;
+        })
+        .join('');
+}
+
+function openProjectConversation(conversationId) {
+    if (!conversationId) return;
+    if (typeof switchPage === 'function') {
+        switchPage('chat');
+    }
+    setTimeout(() => {
+        if (typeof loadConversation === 'function') {
+            loadConversation(conversationId);
+        }
+    }, 200);
+}
+
+async function unbindConversationFromProject(conversationId) {
+    if (!conversationId || !confirm('解除该对话与当前项目的绑定？')) return;
+    const res = await apiFetch(`/api/conversations/${encodeURIComponent(conversationId)}/project`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId: '' }),
+    });
+    if (!res.ok) return alert('解绑失败');
+    loadProjectConversations();
+    refreshProjectHeaderStats();
+}
+
 let _factDetailKey = null;
+let _factDetailFact = null;
+let _projectFactsFilterDebounce = null;
 
 async function viewProjectFactBody(factKey) {
     const res = await apiFetch(`/api/projects/${currentProjectId}/facts?fact_key=${encodeURIComponent(factKey)}`);
     if (!res.ok) return alert('加载失败');
     const f = await res.json();
     _factDetailKey = f.fact_key;
+    _factDetailFact = f;
     document.getElementById('fact-detail-title').textContent = `[${f.fact_key}]`;
     const metaParts = [
         `分类: ${f.category}`,
@@ -483,6 +615,7 @@ async function viewProjectFactBody(factKey) {
     ];
     if (f.related_vulnerability_id) metaParts.push(`关联漏洞: ${f.related_vulnerability_id}`);
     if (f.source_conversation_id) metaParts.push(`来源对话: ${f.source_conversation_id}`);
+    if (f.supersedes_fact_id) metaParts.push('含上一版本');
     document.getElementById('fact-detail-meta').textContent = metaParts.join(' · ');
     document.getElementById('fact-detail-body').textContent = f.body || '(无 body)';
     const warnEl = document.getElementById('fact-detail-sparse-warn');
@@ -496,6 +629,30 @@ async function viewProjectFactBody(factKey) {
             warnEl.textContent = '';
         }
     }
+    const prevWrap = document.getElementById('fact-detail-prev-wrap');
+    if (prevWrap) {
+        prevWrap.hidden = true;
+        if (f.id && f.supersedes_fact_id) {
+            try {
+                const prevRes = await apiFetch(
+                    `/api/projects/${currentProjectId}/facts/${encodeURIComponent(f.id)}/previous-version`,
+                );
+                if (prevRes.ok) {
+                    const prev = await prevRes.json();
+                    prevWrap.hidden = false;
+                    document.getElementById('fact-detail-prev-meta').textContent =
+                        `归档于 ${formatProjectTime(prev.archived_at)} · 摘要: ${prev.summary || '—'} · 置信度: ${prev.confidence || '—'}`;
+                    document.getElementById('fact-detail-prev-body').textContent = prev.body || '(无 body)';
+                }
+            } catch (e) {
+                console.warn(e);
+            }
+        }
+    }
+    const linkBtn = document.getElementById('fact-detail-link-vuln-btn');
+    const createBtn = document.getElementById('fact-detail-create-vuln-btn');
+    if (linkBtn) linkBtn.hidden = false;
+    if (createBtn) createBtn.hidden = false;
     openProjectsOverlay('fact-detail-modal');
 }
 
@@ -508,6 +665,99 @@ function editFactFromDetail() {
 function closeFactDetailModal() {
     closeProjectsOverlay('fact-detail-modal');
     _factDetailKey = null;
+    _factDetailFact = null;
+}
+
+async function linkFactToExistingVulnerability() {
+    const f = _factDetailFact;
+    if (!f || !currentProjectId) return;
+    const res = await apiFetch(`/api/vulnerabilities?project_id=${encodeURIComponent(currentProjectId)}&limit=50`);
+    if (!res.ok) return alert('加载漏洞列表失败');
+    const data = await res.json();
+    const items = data.Vulnerabilities || data.vulnerabilities || data.items || [];
+    if (!items.length) return alert('本项目暂无漏洞，请先创建或让 Agent 记录漏洞');
+    const lines = items.map((v, i) => `${i + 1}. [${v.severity}] ${v.title} (${v.id})`);
+    const pick = prompt(`输入序号以关联事实「${f.fact_key}」：\n\n${lines.join('\n')}`);
+    if (pick == null || pick === '') return;
+    const idx = parseInt(pick, 10) - 1;
+    if (Number.isNaN(idx) || idx < 0 || idx >= items.length) return alert('序号无效');
+    const vulnId = items[idx].id;
+    const upd = await apiFetch(`/api/projects/${currentProjectId}/facts/${encodeURIComponent(f.id)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            fact_key: f.fact_key,
+            category: f.category,
+            summary: f.summary,
+            body: f.body || '',
+            confidence: f.confidence,
+            related_vulnerability_id: vulnId,
+        }),
+    });
+    if (!upd.ok) return alert('关联失败');
+    alert('已关联漏洞');
+    closeFactDetailModal();
+    loadProjectFacts();
+}
+
+async function createVulnerabilityFromCurrentFact() {
+    const f = _factDetailFact;
+    if (!f || !currentProjectId) return;
+    let convId =
+        (f.source_conversation_id || '').trim() ||
+        (typeof window.currentConversationId === 'string' ? window.currentConversationId.trim() : '');
+    if (!convId) {
+        convId = prompt('创建漏洞需要对话 ID（可与来源会话一致）：', '')?.trim() || '';
+    }
+    if (!convId) return alert('已取消：未提供 conversation_id');
+    const severity = inferSeverityFromFact(f);
+    const body = {
+        conversation_id: convId,
+        project_id: currentProjectId,
+        title: (f.summary || f.fact_key).slice(0, 200),
+        description: `由项目事实 ${f.fact_key} 生成`,
+        severity,
+        status: 'open',
+        type: f.category || 'finding',
+        target: '',
+        proof: f.body || '',
+        impact: '',
+        recommendation: '',
+    };
+    const res = await apiFetch('/api/vulnerabilities', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        return alert(err.error || '创建漏洞失败');
+    }
+    const vuln = await res.json();
+    await apiFetch(`/api/projects/${currentProjectId}/facts/${encodeURIComponent(f.id)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            fact_key: f.fact_key,
+            category: f.category,
+            summary: f.summary,
+            body: f.body || '',
+            confidence: f.confidence,
+            related_vulnerability_id: vuln.id,
+        }),
+    });
+    alert(`已创建漏洞并关联：${vuln.title || vuln.id}`);
+    closeFactDetailModal();
+    loadProjectFacts();
+    if (currentProjectTab === 'vulns') loadProjectVulnerabilities();
+}
+
+function inferSeverityFromFact(f) {
+    const c = (f.category || '').toLowerCase();
+    const key = (f.fact_key || '').toLowerCase();
+    if (c === 'exploit' || c === 'poc' || key.includes('rce') || key.includes('sqli')) return 'high';
+    if (c === 'finding' || c === 'chain') return 'medium';
+    return 'medium';
 }
 
 async function deprecateProjectFactByKey(factKey) {
@@ -573,6 +823,7 @@ async function loadProjectVulnerabilities() {
             <td class="col-actions">
                 <div class="projects-table-actions">
                     <button type="button" class="projects-action-btn projects-action-btn--view" data-vuln-id="${idEsc}" onclick="openVulnerabilityDetail(this.dataset.vulnId)">查看</button>
+                    <button type="button" class="projects-action-btn projects-action-btn--view" data-vuln-id="${idEsc}" onclick="viewFactsForVulnerability(this.dataset.vulnId)" title="查看关联事实">事实</button>
                 </div>
             </td>
         </tr>`;
@@ -585,6 +836,44 @@ function openVulnerabilityDetail(vulnId) {
     if (typeof window.setVulnerabilityIdFilter === 'function') {
         setTimeout(() => window.setVulnerabilityIdFilter(vulnId), 300);
     }
+}
+
+async function viewFactsForVulnerability(vulnId) {
+    if (!currentProjectId) return;
+    switchProjectTab('facts');
+    const searchEl = document.getElementById('project-facts-search');
+    const catEl = document.getElementById('project-facts-filter-category');
+    const confEl = document.getElementById('project-facts-filter-confidence');
+    const sparseEl = document.getElementById('project-facts-filter-sparse');
+    const hideDepEl = document.getElementById('project-facts-filter-hide-deprecated');
+    if (searchEl) searchEl.value = '';
+    if (catEl) catEl.value = '';
+    if (confEl) confEl.value = '';
+    if (sparseEl) sparseEl.checked = false;
+    if (hideDepEl) hideDepEl.checked = true;
+    const params = new URLSearchParams({ limit: '50', related_vulnerability_id: vulnId });
+    const res = await apiFetch(`/api/projects/${currentProjectId}/facts?${params}`);
+    if (!res.ok) return alert('加载关联事实失败');
+    const facts = await res.json();
+    if (!facts.length) {
+        alert('该漏洞暂无关联事实，可在事实详情中「关联漏洞」或「生成漏洞草稿」建立链接');
+        loadProjectFacts();
+        return;
+    }
+    if (facts.length === 1) {
+        viewProjectFactBody(facts[0].fact_key);
+        return;
+    }
+    const pick = prompt(
+        `该漏洞关联 ${facts.length} 条事实，输入序号查看：\n${facts.map((f, i) => `${i + 1}. ${f.fact_key}`).join('\n')}`,
+    );
+    if (pick == null || pick === '') {
+        loadProjectFacts();
+        return;
+    }
+    const idx = parseInt(pick, 10) - 1;
+    if (facts[idx]) viewProjectFactBody(facts[idx].fact_key);
+    else loadProjectFacts();
 }
 
 function openProjectsOverlay(id) {
@@ -683,6 +972,7 @@ async function saveProjectSettings() {
         description: document.getElementById('project-edit-description').value.trim(),
         scope_json: scopeRaw,
         status: document.getElementById('project-edit-status')?.value || 'active',
+        pinned: !!document.getElementById('project-edit-pinned')?.checked,
     };
     const res = await apiFetch(`/api/projects/${currentProjectId}`, {
         method: 'PUT',
@@ -1143,6 +1433,7 @@ window.toggleChatProjectPanel = toggleChatProjectPanel;
 window.closeChatProjectPanel = closeChatProjectPanel;
 window.selectChatProject = selectChatProject;
 window.prefetchProjectsForChat = prefetchProjectsForChat;
+window.ensureDefaultActiveProjectForNewChat = ensureDefaultActiveProjectForNewChat;
 window.getActiveProjectId = getActiveProjectId;
 window.getProjectName = getProjectName;
 window.viewProjectFactBody = viewProjectFactBody;
@@ -1153,5 +1444,12 @@ window.restoreProjectFactByKey = restoreProjectFactByKey;
 window.openVulnerabilitiesForProject = openVulnerabilitiesForProject;
 window.openVulnerabilityDetail = openVulnerabilityDetail;
 window.filterProjectsList = filterProjectsList;
+window.debouncedLoadProjectFacts = debouncedLoadProjectFacts;
+window.linkFactToExistingVulnerability = linkFactToExistingVulnerability;
+window.createVulnerabilityFromCurrentFact = createVulnerabilityFromCurrentFact;
+window.viewFactsForVulnerability = viewFactsForVulnerability;
+window.openProjectConversation = openProjectConversation;
+window.unbindConversationFromProject = unbindConversationFromProject;
+window.loadProjectConversations = loadProjectConversations;
 window.rebuildProjectNameMap = rebuildProjectNameMap;
 window.projectNameById = projectNameById;

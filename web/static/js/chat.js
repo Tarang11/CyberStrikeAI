@@ -2912,6 +2912,9 @@ async function startNewConversation() {
         window.currentConversationId = '';
     } catch (e) { /* ignore */ }
     currentConversationGroupId = null; // 新对话不属于任何分组
+    if (typeof ensureDefaultActiveProjectForNewChat === 'function') {
+        ensureDefaultActiveProjectForNewChat().catch(() => {});
+    }
     if (typeof refreshChatProjectSelector === 'function') {
         refreshChatProjectSelector();
     }

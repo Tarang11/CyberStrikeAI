@@ -1453,6 +1453,8 @@
                                         <div class="projects-detail-stats" id="projects-detail-stats">
                                             <span class="projects-stat-chip" id="project-stat-facts">0 条事实</span>
                                             <span class="projects-stat-chip" id="project-stat-vulns">0 个漏洞</span>
+                                            <span class="projects-stat-chip" id="project-stat-conversations">0 个对话</span>
+                                            <span class="projects-stat-chip projects-stat-chip--warn" id="project-stat-sparse" hidden>0 待补全</span>
                                         </div>
                                     </div>
                                     <div class="projects-detail-header-actions">
@@ -1462,18 +1464,79 @@
                                 </header>
                                 <nav class="projects-tabs" role="tablist">
                                     <button type="button" id="project-tab-facts" class="projects-tab is-active" role="tab" onclick="switchProjectTab('facts')">事实黑板</button>
+                                    <button type="button" id="project-tab-conversations" class="projects-tab" role="tab" onclick="switchProjectTab('conversations')">关联对话</button>
                                     <button type="button" id="project-tab-vulns" class="projects-tab" role="tab" onclick="switchProjectTab('vulns')">关联漏洞</button>
                                     <button type="button" id="project-tab-settings" class="projects-tab" role="tab" onclick="switchProjectTab('settings')">设置</button>
                                 </nav>
                                 <div id="project-panel-facts" class="projects-panel" role="tabpanel">
-                                    <div class="projects-panel-toolbar">
-                                        <span class="projects-panel-hint">索引仅含 key + 摘要（须含「什么+在哪+如何验证」）；攻击链/POC 写在 body，Agent 通过 get_project_fact 复现</span>
-                                        <button class="btn-primary btn-small" type="button" onclick="showAddFactModal()">+ 添加事实</button>
+                                    <div class="projects-fact-toolbar">
+                                        <p class="projects-fact-toolbar-hint" role="note">
+                                            <svg class="projects-fact-toolbar-hint-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+                                                <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/>
+                                                <path d="M12 10v6M12 8h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                            </svg>
+                                            <span>索引仅含 <strong>key</strong> 与 <strong>摘要</strong>（须含「什么 + 在哪 + 如何验证」）；攻击链 / POC 写在 <strong>body</strong>，Agent 通过 <code>get_project_fact</code> 复现</span>
+                                        </p>
+                                        <div class="projects-fact-toolbar-filters" role="search">
+                                            <label class="projects-fact-filter-field projects-fact-filter-field--search">
+                                                <span class="sr-only">搜索事实</span>
+                                                <svg class="projects-fact-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+                                                    <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/>
+                                                    <path d="M20 20L16 16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                                </svg>
+                                                <input type="search" id="project-facts-search" placeholder="搜索 key、摘要、body…" oninput="debouncedLoadProjectFacts()" autocomplete="off">
+                                            </label>
+                                            <label class="projects-fact-filter-field">
+                                                <span class="projects-fact-filter-label">分类</span>
+                                                <select id="project-facts-filter-category" onchange="loadProjectFacts()">
+                                                    <option value="">全部</option>
+                                                    <option value="target">target</option>
+                                                    <option value="auth">auth</option>
+                                                    <option value="infra">infra</option>
+                                                    <option value="business">business</option>
+                                                    <option value="finding">finding</option>
+                                                    <option value="chain">chain</option>
+                                                    <option value="exploit">exploit</option>
+                                                    <option value="poc">poc</option>
+                                                    <option value="note">note</option>
+                                                </select>
+                                            </label>
+                                            <label class="projects-fact-filter-field">
+                                                <span class="projects-fact-filter-label">置信度</span>
+                                                <select id="project-facts-filter-confidence" onchange="loadProjectFacts()">
+                                                    <option value="">全部</option>
+                                                    <option value="confirmed">已确认</option>
+                                                    <option value="tentative">待确认</option>
+                                                    <option value="deprecated">已废弃</option>
+                                                </select>
+                                            </label>
+                                            <div class="projects-fact-filter-toggles" role="group" aria-label="显示选项">
+                                                <label class="projects-fact-toggle">
+                                                    <input type="checkbox" id="project-facts-filter-sparse" onchange="loadProjectFacts()">
+                                                    <span>仅待补全</span>
+                                                </label>
+                                                <label class="projects-fact-toggle">
+                                                    <input type="checkbox" id="project-facts-filter-hide-deprecated" checked onchange="loadProjectFacts()">
+                                                    <span>隐藏废弃</span>
+                                                </label>
+                                            </div>
+                                        </div>
                                     </div>
                                     <div class="projects-table-wrap">
                                         <table class="data-table data-table--projects">
                                             <thead><tr><th>Key</th><th>分类</th><th>摘要</th><th>Body</th><th>置信度</th><th>更新</th><th class="col-actions">操作</th></tr></thead>
                                             <tbody id="project-facts-tbody"></tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                                <div id="project-panel-conversations" class="projects-panel" role="tabpanel" hidden>
+                                    <div class="projects-panel-toolbar">
+                                        <span class="projects-panel-hint">绑定到本项目的对话；点击可打开会话</span>
+                                    </div>
+                                    <div class="projects-table-wrap">
+                                        <table class="data-table data-table--projects">
+                                            <thead><tr><th>标题</th><th>更新</th><th class="col-actions">操作</th></tr></thead>
+                                            <tbody id="project-conversations-tbody"></tbody>
                                         </table>
                                     </div>
                                 </div>
@@ -1527,8 +1590,13 @@
                                                         </div>
                                                     </div>
                                                     <div class="projects-form-field">
+                                                        <label class="projects-filter-check projects-pin-toggle">
+                                                            <input type="checkbox" id="project-edit-pinned"> 置顶项目（列表优先显示）
+                                                        </label>
+                                                    </div>
+                                                    <div class="projects-form-field">
                                                         <label for="project-edit-description">描述</label>
-                                                        <textarea id="project-edit-description" class="form-input" rows="4" placeholder="测试目标、授权范围、联系人、注意事项…"></textarea>
+                                                        <textarea id="project-edit-description" class="form-input" rows="3" placeholder="测试目标、授权范围、联系人、注意事项…"></textarea>
                                                     </div>
                                                 </div>
                                             </section>
@@ -1572,14 +1640,14 @@
                                                 <button class="btn-secondary btn-small btn-danger-outline" type="button" onclick="deleteCurrentProject()">删除项目</button>
                                             </div>
                                         </section>
-                                        <footer class="projects-settings-footer">
-                                            <span class="projects-settings-footer-hint">修改后请点击保存以同步到服务器</span>
-                                            <button class="btn-primary" type="button" onclick="saveProjectSettings()">
-                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                                                保存更改
-                                            </button>
-                                        </footer>
                                     </div>
+                                    <footer class="projects-settings-footer">
+                                        <span class="projects-settings-footer-hint">修改后请点击保存以同步到服务器</span>
+                                        <button class="btn-primary" type="button" onclick="saveProjectSettings()">
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                                            保存更改
+                                        </button>
+                                    </footer>
                                 </div>
                             </div>
                         </main>
@@ -4046,11 +4114,23 @@
             </div>
             <div class="projects-modal-body">
                 <p id="fact-detail-sparse-warn" class="projects-fact-sparse-warn" hidden></p>
+                <div id="fact-detail-prev-wrap" class="fact-detail-prev-wrap" hidden>
+                    <h4 class="fact-detail-prev-title">上一版本</h4>
+                    <p id="fact-detail-prev-meta" class="projects-modal-subtitle"></p>
+                    <pre id="fact-detail-prev-body" class="fact-detail-body fact-detail-body--muted"></pre>
+                </div>
+                <h4 class="fact-detail-current-title">当前版本</h4>
                 <pre id="fact-detail-body" class="fact-detail-body"></pre>
             </div>
-            <div class="projects-modal-footer">
-                <button class="btn-secondary" type="button" onclick="closeFactDetailModal()">关闭</button>
-                <button class="btn-primary" type="button" id="fact-detail-edit-btn" onclick="editFactFromDetail()">编辑</button>
+            <div class="projects-modal-footer projects-modal-footer--split">
+                <div class="projects-modal-footer-left">
+                    <button class="btn-secondary btn-small" type="button" id="fact-detail-link-vuln-btn" onclick="linkFactToExistingVulnerability()" hidden>关联漏洞</button>
+                    <button class="btn-secondary btn-small" type="button" id="fact-detail-create-vuln-btn" onclick="createVulnerabilityFromCurrentFact()" hidden>生成漏洞草稿</button>
+                </div>
+                <div class="projects-modal-footer-right">
+                    <button class="btn-secondary" type="button" onclick="closeFactDetailModal()">关闭</button>
+                    <button class="btn-primary" type="button" id="fact-detail-edit-btn" onclick="editFactFromDetail()">编辑</button>
+                </div>
             </div>
         </div>
     </div>

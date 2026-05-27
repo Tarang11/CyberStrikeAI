@@ -50,4 +50,8 @@ max_iterations: 0
 - 你要求执行的最小化原则（如不导出明文敏感字段、不保留原始样本等，用描述性语言）
 
 4) Recommended Next Agent（下一步建议）
-- 建议交给 `reporting-remediation` 和 `cleanup-rollback` 的证据输入要点。 
+- 建议交给 `reporting-remediation` 和 `cleanup-rollback` 的证据输入要点。
+
+## 边渗透边记录
+
+- **边渗透边记录（强制节奏）**：勿等会话结束或收尾再批量写入。每**确认**一条新认知（开放端口/服务版本、入口路径、认证态或凭据特征、可利用点或攻击面变化）后，**立即**调用 `upsert_project_fact`（同 fact_key 覆盖更新）。每**验证**出一条可复现漏洞（含 POC/影响）后，**立即**调用 `record_vulnerability`；与事实可各记一次。继续下一步工作前优先落库，避免上下文压缩后细节丢失。未绑项目时说明无法写黑板，仍在本轮保留证据摘要。若工具集中无上述工具，须在交付物末尾给出「待落库」结构化条目（fact_key 建议、summary、body/POC 要点），供协调者**立即**写入。

@@ -2068,69 +2068,78 @@ function showToastNotification(message, type = 'info') {
     const toast = document.createElement('div');
     toast.className = `toast-notification toast-${type}`;
     
-    // 根据类型设置颜色
     const typeStyles = {
         success: {
-            background: '#28a745',
-            color: '#fff',
-            icon: '✅'
+            background: '#f4fbf6',
+            border: '1px solid #cce8d4',
+            color: '#3d6654',
+            iconColor: '#52a06a',
+            icon: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.2"/><path d="M5 8l2 2 4-4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>'
         },
         error: {
-            background: '#dc3545',
-            color: '#fff',
-            icon: '❌'
+            background: '#fef7f7',
+            border: '1px solid #f3d0d0',
+            color: '#8b4444',
+            iconColor: '#c96a6a',
+            icon: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.2"/><path d="M6 6l4 4M10 6l-4 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>'
         },
         info: {
-            background: '#17a2b8',
-            color: '#fff',
-            icon: 'ℹ️'
+            background: '#f5f9ff',
+            border: '1px solid #cfe0f5',
+            color: '#4a6078',
+            iconColor: '#6b8fbf',
+            icon: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.2"/><path d="M8 7v4M8 5.5v.01" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>'
         },
         warning: {
-            background: '#ffc107',
-            color: '#000',
-            icon: '⚠️'
+            background: '#fffbf3',
+            border: '1px solid #f0dfc0',
+            color: '#7a6535',
+            iconColor: '#c4a04a',
+            icon: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 2.5l6 10.5H2L8 2.5z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M8 7v2.5M8 11v.01" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>'
         }
     };
-    
+
     const style = typeStyles[type] || typeStyles.info;
-    
+
     toast.style.cssText = `
         background: ${style.background};
+        border: ${style.border};
         color: ${style.color};
-        padding: 14px 20px;
-        border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-        min-width: 300px;
-        max-width: 500px;
+        padding: 10px 14px;
+        border-radius: 10px;
+        box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+        min-width: 220px;
+        max-width: 420px;
         pointer-events: auto;
-        animation: slideInRight 0.3s ease-out;
+        animation: slideInRight 0.25s ease-out;
         display: flex;
         align-items: center;
-        gap: 12px;
-        font-size: 0.9375rem;
-        line-height: 1.5;
+        gap: 10px;
+        font-size: 0.875rem;
+        line-height: 1.45;
         word-wrap: break-word;
+        backdrop-filter: blur(8px);
     `;
-    
+
     toast.innerHTML = `
-        <span style="font-size: 1.2em; flex-shrink: 0;">${style.icon}</span>
+        <span style="color: ${style.iconColor}; flex-shrink: 0; display: flex; align-items: center;">${style.icon}</span>
         <span style="flex: 1;">${escapeHtml(message)}</span>
         <button onclick="this.parentElement.remove()" style="
             background: transparent;
             border: none;
             color: ${style.color};
             cursor: pointer;
-            font-size: 1.2em;
+            font-size: 1rem;
             padding: 0;
-            margin-left: 8px;
-            opacity: 0.7;
+            margin-left: 4px;
+            opacity: 0.45;
             flex-shrink: 0;
-            width: 24px;
-            height: 24px;
+            width: 20px;
+            height: 20px;
             display: flex;
             align-items: center;
             justify-content: center;
-        " onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'">×</button>
+        " onmouseover="this.style.opacity='0.75'" onmouseout="this.style.opacity='0.45'">×</button>
     `;
     
     container.appendChild(toast);
@@ -2156,7 +2165,7 @@ if (!document.getElementById('toast-notification-styles')) {
     style.textContent = `
         @keyframes slideInRight {
             from {
-                transform: translateX(100%);
+                transform: translateX(16px);
                 opacity: 0;
             }
             to {
@@ -2170,7 +2179,7 @@ if (!document.getElementById('toast-notification-styles')) {
                 opacity: 1;
             }
             to {
-                transform: translateX(100%);
+                transform: translateX(16px);
                 opacity: 0;
             }
         }
