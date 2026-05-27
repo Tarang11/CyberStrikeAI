@@ -1013,6 +1013,8 @@ func (h *AgentHandler) createProgressCallback(runCtx context.Context, cancelRun 
 	}
 	thinkingStreams := make(map[string]*thinkingBuf) // streamId -> buf
 	flushedThinking := make(map[string]bool)         // streamId -> flushed
+	seenToolCallSigs := make(map[string]string)      // toolCallId -> payload signature
+	seenToolResultSigs := make(map[string]string)    // toolCallId -> payload signature
 
 	// response_start + response_delta：前端时间线显示为「📝 规划中」（monitor.js），不落逐条 delta；
 	// 聚合为一条 planning 写入 process_details，刷新后与线上一致。
@@ -1075,6 +1077,29 @@ func (h *AgentHandler) createProgressCallback(runCtx context.Context, cancelRun 
 	}
 
 	return func(eventType, message string, data interface{}) {
+		// 上游在重试/补偿时可能重复回调相同 tool_call/tool_result。
+		// 这里做幂等过滤，保证前端展示和 process_details 都以唯一事件为准。
+		if (eventType == "tool_call" || eventType == "tool_result") && data != nil {
+			if dataMap, ok := data.(map[string]interface{}); ok {
+				toolCallID := strings.TrimSpace(fmt.Sprint(dataMap["toolCallId"]))
+				if toolCallID != "" && toolCallID != "<nil>" {
+					payloadJSON, _ := json.Marshal(dataMap)
+					sig := eventType + "|" + message + "|" + string(payloadJSON)
+					seen := seenToolCallSigs
+					if eventType == "tool_result" {
+						seen = seenToolResultSigs
+					}
+					if prev, exists := seen[toolCallID]; exists && prev == sig {
+						h.logger.Debug("跳过重复工具进度事件",
+							zap.String("eventType", eventType),
+							zap.String("toolCallId", toolCallID))
+						return
+					}
+					seen[toolCallID] = sig
+				}
+			}
+		}
+
 		// 流式：写 HTTP SSE；非流式（机器人等）：镜像到 taskEventBus 供 Web 订阅
 		if sendEventFunc != nil {
 			sendEventFunc(eventType, message, data)
